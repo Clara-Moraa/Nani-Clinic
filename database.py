@@ -98,6 +98,20 @@ class DatabaseManager:
                 FOREIGN KEY (doctor_id) REFERENCES users (id)
             )
         ''')
+        # Appointments table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS appointments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER,
+                appointment_date DATETIME NOT NULL,
+                reason TEXT,
+                status TEXT DEFAULT 'Scheduled',
+                assigned_to INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patient_id) REFERENCES patients (id),
+                FOREIGN KEY (assigned_to) REFERENCES users (id)
+            )
+        ''')
         
         self.conn.commit()
 
@@ -218,6 +232,36 @@ class DatabaseManager:
         if patient_id:
             query += " WHERE patient_id = ?"
             return pd.read_sql_query(query, self.conn, params=(patient_id,))
+        return pd.read_sql_query(query, self.conn)
+    
+    # Appointment
+    def get_appointments(self, date=None, staff_id=None):
+        """Retrieve appointments, optionally filtered by date and staff"""
+        query = """
+            SELECT 
+                appointments.id,
+                appointments.appointment_date,
+                appointments.reason,
+                appointments.status,
+                patients.name as patient_name,
+                patients.id as patient_id,
+                users.full_name as assigned_to,
+                users.id as assigned_to_id
+            FROM appointments
+            JOIN patients ON appointments.patient_id = patients.id
+            LEFT JOIN users ON appointments.assigned_to = users.id
+        """
+        
+        if date and staff_id:
+            query += " WHERE DATE(appointments.appointment_date) = ? AND appointments.assigned_to = ?"
+            return pd.read_sql_query(query, self.conn, params=(date, staff_id))
+        elif date:
+            query += " WHERE DATE(appointments.appointment_date) = ?"
+            return pd.read_sql_query(query, self.conn, params=(date,))
+        elif staff_id:
+            query += " WHERE appointments.assigned_to = ?"
+            return pd.read_sql_query(query, self.conn, params=(staff_id,))
+        
         return pd.read_sql_query(query, self.conn)
 
     # Financial methods
